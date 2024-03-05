@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<VBox maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="400.0" prefWidth="600.0" xmlns="http://javafx.com/javafx/17.0.2-ea" xmlns:fx="http://javafx.com/fxml/1" fx:controller="ru.vorotov.simulationslab4.SimController">
+    <children>
+        <ToolBar prefHeight="40.0" prefWidth="200.0">
+            <items>
+                <Button mnemonicParsing="false" onAction="#onStartButtonClick" text="Start" />
+            <Button mnemonicParsing="false" onAction="#onStopButtonClick" text="Stop" />
+                <Button mnemonicParsing="false" onAction="#onClearButtonClick" text="Clear" />
+                <Label nodeOrientation="RIGHT_TO_LEFT" text="Rule">
+                    <graphic>
+                        <TextField fx:id="ruleField" nodeOrientation="LEFT_TO_RIGHT" text="110" />
+                    </graphic>
+                </Label>
+            </items>
+        </ToolBar>
+        <GridPane fx:id="gridPane" />
+    </children>
+</VBox>
