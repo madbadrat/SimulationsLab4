@@ -3,20 +3,15 @@ package ru.vorotov.simulationslab4;
 import javafx.application.Platform;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
-import javafx.fxml.Initializable;
 import javafx.scene.control.TextField;
 import javafx.scene.input.MouseButton;
 import javafx.scene.layout.GridPane;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Rectangle;
 
-import java.net.URL;
 import java.util.Random;
-import java.util.ResourceBundle;
-import java.util.Timer;
-import java.util.TimerTask;
 
-public class SimController implements Initializable {
+public class SimController {
     @FXML
     private GridPane gridPane;
     @FXML
@@ -24,12 +19,15 @@ public class SimController implements Initializable {
 
     private final int GRID_SIZE = 20;
     private final int CELL_SIZE = 20;
-    private final int[][] grid = new int[GRID_SIZE][GRID_SIZE];
-    private Timer timer;
+    private final int DEAD_CELL = 0;
+    private final int LIVE_CELL = 1;
+    private final int ACTIVE_CELL = 2;
+    private int[][] grid = new int[GRID_SIZE][GRID_SIZE];
     private Random random = new Random();
+    private boolean simulationRunning = false;
 
-    @Override
-    public void initialize(URL url, ResourceBundle resourceBundle) {
+    @FXML
+    public void initialize() {
         drawGrid();
     }
 
@@ -38,20 +36,23 @@ public class SimController implements Initializable {
             for (int j = 0; j < GRID_SIZE; j++) {
                 Rectangle cell = new Rectangle(CELL_SIZE, CELL_SIZE);
                 cell.setStroke(Color.BLACK);
-
-                if (grid[i][j] == 1) cell.setFill(Color.BLUE);
-                else cell.setFill(Color.WHITE);
+                cell.setFill(Color.WHITE);
 
                 int x = i;
                 int y = j;
 
                 cell.setOnMouseClicked(event -> {
-                    if (grid[x][y] == 0 && event.getButton() == MouseButton.PRIMARY) {
-                        grid[x][y] = 1;
-                        cell.setFill(Color.BLUE);
-                    } else if (grid[x][y] == 1 && event.getButton() == MouseButton.SECONDARY) {
-                        grid[x][y] = 0;
-                        cell.setFill(Color.WHITE);
+                    if (!simulationRunning) {
+                        if (grid[x][y] == DEAD_CELL && event.getButton() == MouseButton.PRIMARY) {
+                            grid[x][y] = LIVE_CELL;
+                            cell.setFill(Color.BLUE);
+                        } else if (grid[x][y] == LIVE_CELL && event.getButton() == MouseButton.SECONDARY) {
+                            grid[x][y] = DEAD_CELL;
+                            cell.setFill(Color.WHITE);
+                        } else if (event.getButton() == MouseButton.PRIMARY && event.getClickCount() == 2) {
+                            grid[x][y] = ACTIVE_CELL;
+                            cell.setFill(Color.RED);
+                        }
                     }
                 });
 
@@ -60,15 +61,29 @@ public class SimController implements Initializable {
         }
     }
 
+    @FXML
     public void onStartButtonClick(ActionEvent actionEvent) {
-        if (timer == null) {
-            timer = new Timer();
-            timer.scheduleAtFixedRate(new TimerTask() {
-                @Override
-                public void run() {
-                    updateGrid();
-                }
-            }, 0, 100);
+        if (!simulationRunning) {
+            simulationRunning = true;
+            Thread simulationThread = new Thread(this::runSimulation);
+            simulationThread.setDaemon(true);
+            simulationThread.start();
+        }
+    }
+
+    @FXML
+    public void onStopButtonClick(ActionEvent actionEvent) {
+        simulationRunning = false;
+    }
+
+    private void runSimulation() {
+        while (simulationRunning) {
+            updateGrid();
+            try {
+                Thread.sleep(100);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
         }
     }
 
@@ -81,19 +96,24 @@ public class SimController implements Initializable {
 
                 double stayAliveProbability = 0.7;
                 double becomeAliveProbability = 0.2;
+                double becomeActiveProbability = 0.1;
 
-                if (grid[i][j] == 1) {
-                    if (random.nextDouble() < stayAliveProbability) {
-                        newGrid[i][j] = 1;
-                    } else {
-                        newGrid[i][j] = 0;
-                    }
-                } else {
+                if (grid[i][j] == DEAD_CELL) {
                     if (random.nextDouble() < becomeAliveProbability * (aliveNeighbors / 8.0)) {
-                        newGrid[i][j] = 1;
+                        newGrid[i][j] = LIVE_CELL;
                     } else {
-                        newGrid[i][j] = 0;
+                        newGrid[i][j] = DEAD_CELL;
                     }
+                } else if (grid[i][j] == LIVE_CELL) {
+                    if (random.nextDouble() < stayAliveProbability) {
+                        newGrid[i][j] = LIVE_CELL;
+                    } else if (random.nextDouble() < becomeActiveProbability) {
+                        newGrid[i][j] = ACTIVE_CELL;
+                    } else {
+                        newGrid[i][j] = DEAD_CELL;
+                    }
+                } else if (grid[i][j] == ACTIVE_CELL) {
+                    newGrid[i][j] = LIVE_CELL;
                 }
             }
         }
@@ -103,8 +123,10 @@ public class SimController implements Initializable {
                 for (int j = 0; j < GRID_SIZE; j++) {
                     grid[i][j] = newGrid[i][j];
                     Rectangle cell = (Rectangle) gridPane.getChildren().get(i * GRID_SIZE + j);
-                    if (grid[i][j] == 1) {
+                    if (grid[i][j] == LIVE_CELL) {
                         cell.setFill(Color.BLUE);
+                    } else if (grid[i][j] == ACTIVE_CELL) {
+                        cell.setFill(Color.RED);
                     } else {
                         cell.setFill(Color.WHITE);
                     }
@@ -117,7 +139,7 @@ public class SimController implements Initializable {
         int count = 0;
         for (int i = x - 1; i <= x + 1; i++) {
             for (int j = y - 1; j <= y + 1; j++) {
-                if ((i != x || j != y) && i >= 0 && i < GRID_SIZE && j >= 0 && j < GRID_SIZE && grid[i][j] == 1) {
+                if (i >= 0 && i < GRID_SIZE && j >= 0 && j < GRID_SIZE && !(i == x && j == y) && grid[i][j] == LIVE_CELL) {
                     count++;
                 }
             }
@@ -125,19 +147,6 @@ public class SimController implements Initializable {
         return count;
     }
 
-    public void onStopButtonClick(ActionEvent actionEvent) {
-        if (timer != null) {
-            timer.cancel();
-            timer = null;
-        }
-    }
-
     public void onClearButtonClick(ActionEvent actionEvent) {
-        for (int i = 0; i < GRID_SIZE; i++) {
-            for (int j = 0; j < GRID_SIZE; j++) {
-                grid[i][j] = 0;
-            }
-        }
-        drawGrid();
     }
 }
